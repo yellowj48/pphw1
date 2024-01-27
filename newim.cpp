@@ -2,6 +2,7 @@
 #include <thread>
 #include <cmath>
 #include <atomic>
+#include <vector>
 
 class Counter {
 private:
@@ -12,6 +13,15 @@ public:
 
     long long getAndIncrement() {
         return value++;
+    }
+    long long check()
+    {
+        return value.load();
+    }
+    void set(long long x)
+    {
+        value.store(x);
+        
     }
 };
 
@@ -27,6 +37,15 @@ bool isPrime(long int x) {
     }
     return true;
 }
+void markoff(Counter& counter, std::vector<bool>&table, long long n, long long x){
+    long long mult = counter.getAndIncrement();
+    while(mult*x <= n)
+    {
+        table[mult*x] = false;
+        mult = counter.getAndIncrement();
+    }
+}
+
 
 void primePrint(Counter& counter, long long n) {
     long long j = 0;
@@ -41,30 +60,29 @@ void primePrint(Counter& counter, long long n) {
 
 int main() {
     auto start = std::chrono::high_resolution_clock::now();
+    
 
     const int numThreads = 8;
     Counter counter(2);
     long long n = 1e8;
+    std::vector<bool> table(n+1, true);
+    table[0] = table[1] = false;
+    for (int i = 2; i <= n; i++) {
+    if (table[i] && (long long)i * i <= n) {
+        counter.set(2);
+        for (int j =0; j < 8; j++)
+        {
+            std::thread t(markoff, std::ref(counter), std::ref(table), n, i);
+            t.detach();
+        }
+        while(counter.check()*i <= n)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+    }
+}
 
-    // Create threads with std::ref
-    std::thread t1(primePrint, std::ref(counter), n);
-    std::thread t2(primePrint, std::ref(counter), n);
-    std::thread t3(primePrint, std::ref(counter), n);
-    std::thread t4(primePrint, std::ref(counter), n);
-    std::thread t5(primePrint, std::ref(counter), n);
-    std::thread t6(primePrint, std::ref(counter), n);
-    std::thread t7(primePrint, std::ref(counter), n);
-    std::thread t8(primePrint, std::ref(counter), n);
 
-    // // Join threads
-    t1.detach();
-    t2.detach();
-    t3.detach();
-    t4.detach();
-    t5.detach();
-    t6.detach();
-    t7.detach();
-    t8.join();
 
     std::cout << "Count = " << prime_count << std::endl;
     std::cout << "Sum of primes = " << total_sum << std::endl;
